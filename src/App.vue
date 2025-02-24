@@ -1,7 +1,3 @@
-
-
-
-
 <script setup lang="ts">
 
 import { Authenticator } from "@aws-amplify/ui-vue";
@@ -12,7 +8,6 @@ import Todos from './components/Todos.vue'
 
 <template>
   <main>
-
     <authenticator>
       <template v-slot="{ signOut }">
         <Todos />
