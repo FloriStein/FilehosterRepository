@@ -66,12 +66,9 @@ const filteredFiles = computed(() =>
 
 // Subscription-Variablen
 let querySub: { unsubscribe: () => void } | null = null;
-let createSub: { unsubscribe: () => void } | null = null;
 let deleteSub: { unsubscribe: () => void } | null = null;
 
 onMounted(() => {
-  // Direkt zu Beginn: Abonnieren der Metadaten
-
   // Initiales Laden der Metadaten
   querySub = client.models.MetaData.observeQuery().subscribe({
     next: ({ items }) => {
@@ -88,22 +85,7 @@ onMounted(() => {
     },
   });
 
-  // Automatische Aktualisierung bei neu hochgeladenen Dateien
-  createSub = client.models.MetaData.onCreate().subscribe({
-    next: (newItem: any) => {
-      fileList.value.push({
-        name: newItem.fileName,
-        path: newItem.path,
-        uploadedAt: newItem.uploadedAt,
-        size: newItem.size,
-      });
-    },
-    error: (error: any) => {
-      console.warn("Fehler bei onCreate:", error);
-    },
-  });
-
-  // Automatische Aktualisierung bei gelöschten Dateien
+  // Subscription für gelöschte Dateien
   deleteSub = client.models.MetaData.onDelete().subscribe({
     next: (deletedItem: any) => {
       fileList.value = fileList.value.filter(
@@ -118,7 +100,6 @@ onMounted(() => {
 
 onUnmounted(() => {
   querySub?.unsubscribe();
-  createSub?.unsubscribe();
   deleteSub?.unsubscribe();
 });
 
@@ -139,11 +120,12 @@ const updateFile = (updatedFile: FileItem) => {
   }
 };
 
-// Dateien nach erfolgreichem Upload zur Liste hinzufügen
-const handleUploadComplete = () => {
-  // Keine manuelle Aktualisierung, Subscription übernimmt das
+// Dateien nach erfolgreichem Upload: Nur Logging, da die Subscription aktualisiert
+const handleUploadComplete = (uploadedFiles: Array<{ name: string; path: string; size: number }>) => {
+  console.log("Upload complete event empfangen, aber die Liste wird über observeQuery aktualisiert.", uploadedFiles);
 };
-// Aktualisieren der Datei-Liste nach dem Löschen
+
+// Aktualisieren der Datei-Liste nach dem Löschen (falls benötigt)
 const handleFilesDeleted = (updatedFileList: FileItem[]) => {
   selectedFiles.value.clear();
   fileList.value = updatedFileList;
@@ -163,4 +145,3 @@ const getUrlOnDemand = async (file: FileItem): Promise<string | null> => {
   }
 };
 </script>
-

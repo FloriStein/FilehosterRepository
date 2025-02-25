@@ -1,13 +1,14 @@
 /* main.css: Grundlegende Layout-Anpassungen */
 body {
   margin: 0;
-  background: #f3f3f3;  /* Heller, neutraler Hintergrund */
   display: flex;
   height: 100vh;
   width: 100vw;
   justify-content: center;
   align-items: center;
+  overflow: hidden; /* Entfernt den äußeren Scrollbalken */
 }
+
 
 main {
   display: flex;
@@ -115,14 +116,19 @@ button:hover {
   display: flex;
   align-items: center;
   padding: 2px;
+  width: 100%;
   border-bottom: 1px solid var(--color-border);
+  transition: background-color 0.3s ease, transform 0.3s ease;
 }
+
 .file-list li:last-child {
   border-bottom: none;
 }
 .file-list li:hover {
-  background: var(--color-hover);
+  background-color: #f0f8ff !important;
+  transform: translateX(5px) !important;
 }
+
 .file-list input[type="checkbox"] {
   margin-right: 8px;
 }
@@ -162,14 +168,16 @@ button:hover {
 
 
 
-
-
 .file-manager {
   display: grid;
   grid-template-columns: 120px 1fr; /* Linke Spalte: 120px, rechte Spalte: flexibler Platz */
   gap: 20px;
-  height: 100vh;
+
+  background-color: #f9f9f9; /* Gewünschte Hintergrundfarbe */
+  padding: 20px;  /* Optional: für etwas Innenabstand */
+  border-radius: 6px; /* Optional: abgerundete Ecken */
 }
+
 
 /* Linke Spalte bleibt unverändert */
 .left-column {
@@ -183,6 +191,7 @@ button:hover {
   overflow-y: auto;
   padding-top: 70px; /* Fester Abstand nach oben */
   padding-bottom: 20px;
+
 }
 
 /* Rechte Spalte als Flex-Container */
@@ -192,13 +201,16 @@ button:hover {
   height: 100vh;
   width: 600px;  /* Feste Breite für den Inhalt */
   max-width: 100%; /* Verhindert Überlaufen bei kleineren Bildschirmen */
+  background-color: #f9f9f9; /* Hier die gewünschte Hintergrundfarbe */
 }
+
 
 
 /* Dateiliste nimmt den verfügbaren Platz ein */
 .file-list-container {
   flex: 1;
   overflow-y: auto;
+  padding-right: 20px; /* Platz für den Scrollbalken */
 }
 
 /* Signout-Button Container – mit automatischem oberen Rand */
