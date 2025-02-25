@@ -13,11 +13,16 @@
 
 <script setup lang="ts">
 import { ref } from "vue";
-import { uploadData, getUrl } from "aws-amplify/storage";
+import { uploadData } from "aws-amplify/storage";
+import { generateClient } from "aws-amplify/data";
+import type { Schema } from "../../amplify/data/resource";
 
-// Event, um die hochgeladenen Dateien an den Parent zu übermitteln
+// Amplify-Client
+const client = generateClient<Schema>();
+
+// Event-Emitter für den Upload-Abschluss
 const emit = defineEmits<{
-  (e: "uploadComplete", uploadedFiles: Array<{ name: string; path: string }>): void;
+  (e: "uploadComplete", uploadedFiles: Array<{ name: string; path: string; size: number }>): void;
 }>();
 
 const fileInput = ref<HTMLInputElement | null>(null);
@@ -31,42 +36,36 @@ const handleFileChange = async (event: Event) => {
   const files = target.files;
   if (!files || files.length === 0) return;
 
-  const uploadedFiles: Array<{ name: string; path: string }> = [];
-
-  await Promise.all(
+  const uploadedFiles = await Promise.all(
       Array.from(files).map(async (file) => {
-        const fileReader = new FileReader();
-        fileReader.readAsArrayBuffer(file);
+        try {
+          const path = `files/${file.name}`;
+          const fileData = await file.arrayBuffer();
 
-        await new Promise<void>((resolve, reject) => {
-          fileReader.onload = async (e) => {
-            const result = e.target?.result;
-            if (!result) return reject("Fehler beim Lesen der Datei");
-            try {
-              const path = `files/${file.name}`;
-              await uploadData({ data: result, path });
+          // Datei in S3 hochladen
+          await uploadData({ data: fileData, path });
 
-              // getUrl hier nur bei Bedarf verwenden und nicht speichern
-              const fileUrl = await getUrl({
-                path,
-                options: { expiresIn: 5 }
-              });
-              console.log(`Presigned URL für ${file.name}:`, fileUrl.url.toString());
+          // Metadaten in der Datenbank speichern
+          await client.models.MetaData.create({
+            fileName: file.name,
+            path,
+            bucket: "fileHosterStorage",
+            uploadedAt: new Date().toISOString(),
+            size: file.size,
+          });
 
-              uploadedFiles.push({ name: file.name, path });
-              resolve();
-            } catch (error) {
-              console.error("Fehler beim Hochladen", error);
-              reject(error);
-            }
-          };
-        });
+          return { name: file.name, path, size: file.size };
+        } catch (error) {
+          console.error("Fehler beim Hochladen", error);
+          return null;
+        }
       })
   );
 
-  target.value = "";
-  emit("uploadComplete", uploadedFiles);
-};
+  // Erfolgreiche Uploads an FileManager melden
+  emit("uploadComplete", uploadedFiles.filter((f) => f !== null) as Array<{ name: string; path: string; size: number }>);
 
-defineExpose({});
+  // File-Input zurücksetzen
+  target.value = "";
+};
 </script>

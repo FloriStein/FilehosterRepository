@@ -20,9 +20,9 @@
         <FileList
             :fileList="filteredFiles"
             :selectedFiles="selectedFiles"
+            :getUrlOnDemand="getUrlOnDemand"
             @toggleSelection="toggleFileSelection"
             @updateFile="updateFile"
-            @getUrlOnDemand="getUrlOnDemand"
         />
       </div>
     </div>
@@ -33,39 +33,47 @@
 import { ref, computed, onMounted, onUnmounted, defineProps } from "vue";
 import type { PropType } from "vue";
 import { generateClient } from "aws-amplify/data";
-import type { Schema } from '../../amplify/data/resource';
+import type { Schema } from "../../amplify/data/resource";
 import type { FileItem } from "@/types/types";
 import FileSearch from "./FileSearch.vue";
 import FileUploader from "./FileUploader.vue";
 import FileActions from "./FileActions.vue";
 import FileList from "./FileList.vue";
+import { getUrl } from "aws-amplify/storage";
 
 // Sign-Out-Funktion als Prop erhalten
 defineProps({
   signOut: {
     type: Function as PropType<() => void>,
-    required: true
-  }
+    required: true,
+  },
 });
 
-// Amplify-Datenbank-Client
+// Amplify-Datenbank-Client initialisieren
 const client = generateClient<Schema>();
 
+// Zustände
 const searchQuery = ref("");
 const fileList = ref<FileItem[]>([]);
 const selectedFiles = ref<Set<string>>(new Set());
 
+// Computed: Gefilterte Dateien basierend auf der Suchanfrage
 const filteredFiles = computed(() =>
-    fileList.value.filter(file =>
+    fileList.value.filter((file) =>
         file.name.toLowerCase().includes(searchQuery.value.toLowerCase())
     )
 );
 
-let subscription: any = null;
+// Subscription-Variablen
+let querySub: { unsubscribe: () => void } | null = null;
+let createSub: { unsubscribe: () => void } | null = null;
+let deleteSub: { unsubscribe: () => void } | null = null;
 
-// Funktion zum Abrufen der Metadaten
-const fetchMetaData = () => {
-  subscription = client.models.MetaData.observeQuery().subscribe({
+onMounted(() => {
+  // Direkt zu Beginn: Abonnieren der Metadaten
+
+  // Initiales Laden der Metadaten
+  querySub = client.models.MetaData.observeQuery().subscribe({
     next: ({ items }) => {
       fileList.value = items.map((metadata) => ({
         name: metadata.fileName,
@@ -74,13 +82,46 @@ const fetchMetaData = () => {
         size: metadata.size,
       }));
     },
-    error: (err) => {
+    error: (err: any) => {
       console.error("Fehler beim Abrufen der Metadaten:", err);
     },
   });
-};
 
-// Auswahl umschalten
+  // Automatische Aktualisierung bei neu hochgeladenen Dateien
+  createSub = client.models.MetaData.onCreate().subscribe({
+    next: (newItem: any) => {
+      fileList.value.push({
+        name: newItem.fileName,
+        path: newItem.path,
+        uploadedAt: newItem.uploadedAt,
+        size: newItem.size,
+      });
+    },
+    error: (error: any) => {
+      console.warn("Fehler bei onCreate:", error);
+    },
+  });
+
+  // Automatische Aktualisierung bei gelöschten Dateien
+  deleteSub = client.models.MetaData.onDelete().subscribe({
+    next: (deletedItem: any) => {
+      fileList.value = fileList.value.filter(
+          (item) => item.name !== deletedItem.fileName
+      );
+    },
+    error: (error: any) => {
+      console.warn("Fehler bei onDelete:", error);
+    },
+  });
+});
+
+onUnmounted(() => {
+  querySub?.unsubscribe();
+  createSub?.unsubscribe();
+  deleteSub?.unsubscribe();
+});
+
+// Toggle der Dateiauswahl
 const toggleFileSelection = (fileName: string) => {
   if (selectedFiles.value.has(fileName)) {
     selectedFiles.value.delete(fileName);
@@ -89,40 +130,37 @@ const toggleFileSelection = (fileName: string) => {
   }
 };
 
-// Datei in der Liste aktualisieren
+// Aktualisieren einer Datei in der Liste
 const updateFile = (updatedFile: FileItem) => {
-  const index = fileList.value.findIndex(f => f.name === updatedFile.name);
+  const index = fileList.value.findIndex((f) => f.name === updatedFile.name);
   if (index !== -1) {
     fileList.value[index] = updatedFile;
   }
 };
 
-// Hochgeladene Datei hinzufügen
+// Dateien nach erfolgreichem Upload zur Liste hinzufügen
 const handleUploadComplete = (uploadedFiles: FileItem[]) => {
   fileList.value.push(...uploadedFiles);
 };
 
-// Datei nach dem Löschen entfernen
+// Aktualisieren der Datei-Liste nach dem Löschen
 const handleFilesDeleted = (updatedFileList: FileItem[]) => {
   selectedFiles.value.clear();
   fileList.value = updatedFileList;
 };
 
-// Funktion für das Abrufen der URL bei Bedarf
+// Funktion zum Abrufen der URL bei Bedarf
 const getUrlOnDemand = async (file: FileItem): Promise<string | null> => {
   try {
-    const urlResponse = await client.models.MetaData.get({ id: file.path });
-    return urlResponse?.url ?? null;
+    const urlResponse = await getUrl({
+      path: file.path,
+      options: { expiresIn: 5 },
+    });
+    return urlResponse.url.toString();
   } catch (error) {
     console.error(`Fehler beim Laden der URL für ${file.name}`, error);
     return null;
   }
 };
-
-onMounted(fetchMetaData);
-
-// Bei Komponenten-Zerstörung das Subscription-Observable abmelden
-onUnmounted(() => {
-  if (subscription) subscription.unsubscribe();
-});
 </script>
+
