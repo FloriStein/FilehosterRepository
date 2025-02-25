@@ -77,6 +77,7 @@ onMounted(() => {
     next: ({ items }) => {
       fileList.value = items.map((metadata) => ({
         name: metadata.fileName,
+        bucket: metadata.bucket,
         path: metadata.path,
         uploadedAt: metadata.uploadedAt,
         size: metadata.size,
@@ -139,10 +140,9 @@ const updateFile = (updatedFile: FileItem) => {
 };
 
 // Dateien nach erfolgreichem Upload zur Liste hinzufügen
-const handleUploadComplete = (uploadedFiles: FileItem[]) => {
-  fileList.value.push(...uploadedFiles);
+const handleUploadComplete = () => {
+  // Keine manuelle Aktualisierung, Subscription übernimmt das
 };
-
 // Aktualisieren der Datei-Liste nach dem Löschen
 const handleFilesDeleted = (updatedFileList: FileItem[]) => {
   selectedFiles.value.clear();
