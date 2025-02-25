@@ -5,13 +5,12 @@ const schema = a
       MetaData: a
           .model({
               fileName: a.string().required(),
-              path: a.url().required(),
+              path: a.string().required(),
               bucket: a.string().required(),
               uploadedAt: a.datetime().required(),
               size: a.integer().required()
             }).identifier(["fileName"])
-    })
-    .authorization((allow) => [allow.publicApiKey()]);
+    }).authorization((allow) => [allow.publicApiKey()]);
 
 export type Schema = ClientSchema<typeof schema>;
 

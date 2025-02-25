@@ -50,8 +50,8 @@ const handleFileChange = async (event: Event) => {
             fileName: file.name,
             path,
             bucket: "fileHosterStorage",
-            uploadedAt: new Date().toISOString(),
-            size: file.size,
+            uploadedAt: new Date(),
+            size: Number(file.size),
           });
 
           return { name: file.name, path, size: file.size };
