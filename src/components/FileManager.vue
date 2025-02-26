@@ -41,7 +41,9 @@ import FileActions from "./FileActions.vue";
 import FileList from "./FileList.vue";
 import { getUrl } from "aws-amplify/storage";
 
-// Sign-Out-Funktion als Prop erhalten
+/**
+ * Props: signOut-Funktion für die Benutzerabmeldung
+ */
 defineProps({
   signOut: {
     type: Function as PropType<() => void>,
@@ -52,24 +54,28 @@ defineProps({
 // Amplify-Datenbank-Client initialisieren
 const client = generateClient<Schema>();
 
-// Zustände
-const searchQuery = ref("");
-const fileList = ref<FileItem[]>([]);
-const selectedFiles = ref<Set<string>>(new Set());
+// Reaktive Zustände für Datei-Management
+const searchQuery = ref(""); // Suchanfrage
+const fileList = ref<FileItem[]>([]); // Liste aller Dateien
+const selectedFiles = ref<Set<string>>(new Set()); // Auswahl von Dateien
 
-// Computed: Gefilterte Dateien basierend auf der Suchanfrage
+/**
+ * Computed Property: Gefilterte Dateien basierend auf der Suchanfrage
+ */
 const filteredFiles = computed(() =>
     fileList.value.filter((file) =>
         file.name.toLowerCase().includes(searchQuery.value.toLowerCase())
     )
 );
 
-// Subscription-Variablen
+// Subscription-Referenzen
 let querySub: { unsubscribe: () => void } | null = null;
 let deleteSub: { unsubscribe: () => void } | null = null;
 
+/**
+ * Lifecycle Hook: Lädt die Datei-Metadaten bei der Komponentenerstellung und setzt Subscriptions
+ */
 onMounted(() => {
-  // Initiales Laden der Metadaten
   querySub = client.models.MetaData.observeQuery().subscribe({
     next: ({ items }) => {
       fileList.value = items.map((metadata) => ({
@@ -98,12 +104,18 @@ onMounted(() => {
   });
 });
 
+/**
+ * Lifecycle Hook: Bereinigt Subscriptions beim Entladen der Komponente
+ */
 onUnmounted(() => {
   querySub?.unsubscribe();
   deleteSub?.unsubscribe();
 });
 
-// Toggle der Dateiauswahl
+/**
+ * Datei-Auswahl umschalten
+ * @param fileName - Der Name der Datei, die ausgewählt oder abgewählt wird
+ */
 const toggleFileSelection = (fileName: string) => {
   if (selectedFiles.value.has(fileName)) {
     selectedFiles.value.delete(fileName);
@@ -112,7 +124,10 @@ const toggleFileSelection = (fileName: string) => {
   }
 };
 
-// Aktualisieren einer Datei in der Liste
+/**
+ * Aktualisiert eine Datei in der Liste
+ * @param updatedFile - Die aktualisierte Datei mit neuen Metadaten
+ */
 const updateFile = (updatedFile: FileItem) => {
   const index = fileList.value.findIndex((f) => f.name === updatedFile.name);
   if (index !== -1) {
@@ -120,18 +135,28 @@ const updateFile = (updatedFile: FileItem) => {
   }
 };
 
-// Dateien nach erfolgreichem Upload: Nur Logging, da die Subscription aktualisiert
+/**
+ * Callback für erfolgreiche Datei-Uploads
+ * @param uploadedFiles - Liste der hochgeladenen Dateien
+ */
 const handleUploadComplete = (uploadedFiles: Array<{ name: string; path: string; size: number }>) => {
   console.log("Upload complete event empfangen, aber die Liste wird über observeQuery aktualisiert.", uploadedFiles);
 };
 
-// Aktualisieren der Datei-Liste nach dem Löschen (falls benötigt)
+/**
+ * Callback für gelöschte Dateien, setzt die Auswahl zurück
+ * @param updatedFileList - Die aktualisierte Datei-Liste nach Löschvorgang
+ */
 const handleFilesDeleted = (updatedFileList: FileItem[]) => {
   selectedFiles.value.clear();
   fileList.value = updatedFileList;
 };
 
-// Funktion zum Abrufen der URL bei Bedarf
+/**
+ * Lädt eine Datei-URL dynamisch bei Bedarf
+ * @param file - Die Datei, für die die URL abgerufen wird
+ * @returns Die URL der Datei oder null im Fehlerfall
+ */
 const getUrlOnDemand = async (file: FileItem): Promise<string | null> => {
   try {
     const urlResponse = await getUrl({

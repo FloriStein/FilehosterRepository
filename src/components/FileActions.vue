@@ -1,9 +1,11 @@
 <!-- FileActions.vue -->
 <template>
   <div class="file-actions">
+    <!-- Button zum Herunterladen der ausgewählten Dateien als ZIP -->
     <button @click="downloadSelectedFilesAsZip" :disabled="selectedFiles.size === 0">
       Download
     </button>
+    <!-- Button zum Löschen der ausgewählten Dateien -->
     <button @click="deleteSelectedFiles" :disabled="selectedFiles.size === 0">
       Delete
     </button>
@@ -18,75 +20,83 @@ import { generateClient } from "aws-amplify/data";
 import type { Schema } from "../../amplify/data/resource";
 import type { FileItem } from "@/types/types";
 
-// Props und Emits
+// Definiert die empfangenen Props: Eine Menge von ausgewählten Dateinamen und die gesamte Dateiliste
 const props = defineProps<{
-  selectedFiles: Set<string>;
-  fileList: FileItem[];
+  selectedFiles: Set<string>; // Enthält die Namen der aktuell ausgewählten Dateien
+  fileList: FileItem[]; // Enthält die gesamte Liste der Dateien
 }>();
 
+// Definiert Events, die an das übergeordnete Element gesendet werden können
 const emit = defineEmits<{
   (e: "filesDeleted", updatedFileList: FileItem[]): void;
 }>();
 
-// Erstelle den Amplify Data Client für den Zugriff auf die Datenbank
+// Erstellt den Amplify Data Client, um auf die Datenbank (Meta-Daten) zuzugreifen
 const client = generateClient<Schema>();
 
-// Funktion zum Löschen der ausgewählten Dateien inklusive Meta-Daten in der Datenbank
+/**
+ * Löscht die ausgewählten Dateien sowohl aus dem S3-Speicher als auch aus der Datenbank.
+ */
 const deleteSelectedFiles = async () => {
-  const filesToDelete = Array.from(props.selectedFiles);
-  if (filesToDelete.length === 0) return;
+  const filesToDelete = Array.from(props.selectedFiles); // Konvertiert das Set in ein Array
+  if (filesToDelete.length === 0) return; // Falls keine Dateien ausgewählt sind, wird die Funktion beendet
 
   try {
     await Promise.all(
         filesToDelete.map(async (fileName) => {
           const path = `files/${fileName}`;
-          // Datei aus dem S3 Storage löschen
+          // Löscht die Datei aus dem S3-Storage
           await remove({ path });
-          // Entsprechende Meta-Daten löschen (Identifier ist fileName)
+          // Löscht die Meta-Daten der Datei aus der Datenbank
           await client.models.MetaData.delete({ fileName });
         })
     );
 
-    // Aktualisiere die Dateiliste und informiere das Parent
+    // Aktualisiert die Dateiliste, indem die gelöschten Dateien entfernt werden
     const updatedFileList = props.fileList.filter(
         (file) => !filesToDelete.includes(file.name)
     );
-    emit("filesDeleted", updatedFileList);
+    emit("filesDeleted", updatedFileList); // Sendet das aktualisierte Dateiliste-Event
   } catch (error) {
     console.error("Fehler beim Löschen der Dateien", error);
   }
 };
 
-// Funktion zum Herunterladen der ausgewählten Dateien als ZIP
+/**
+ * Erstellt ein ZIP-Archiv mit den ausgewählten Dateien und lädt es herunter.
+ */
 const downloadSelectedFilesAsZip = async () => {
-  const filesToDownload = Array.from(props.selectedFiles);
-  if (filesToDownload.length === 0) return;
+  const filesToDownload = Array.from(props.selectedFiles); // Konvertiert das Set in ein Array
+  if (filesToDownload.length === 0) return; // Falls keine Dateien ausgewählt sind, wird die Funktion beendet
 
-  const zip = new JSZip();
+  const zip = new JSZip(); // Erstellt eine neue ZIP-Datei
 
   try {
     await Promise.all(
         filesToDownload.map(async (fileName) => {
           const fileItem = props.fileList.find((file) => file.name === fileName);
-          if (!fileItem) return;
+          if (!fileItem) return; // Falls die Datei nicht gefunden wird, überspringen
 
-          // Erhalte eine Presigned URL beim tatsächlichen Download
+          // Holt die Presigned-URL für den Download
           const urlResponse = await getUrl({
             path: fileItem.path,
-            options: { expiresIn: 5 }
+            options: { expiresIn: 5 }, // Die URL ist nur 5 Sekunden gültig
           });
           const url = urlResponse.url.toString();
 
+          // Holt die Datei über die Presigned-URL
           const response = await fetch(url);
           if (!response.ok) {
             throw new Error(`Fehler beim Herunterladen von ${fileName}`);
           }
 
+          // Konvertiert die Datei in ein ArrayBuffer, um sie ins ZIP-Archiv einzufügen
           const arrayBuffer = await response.arrayBuffer();
           zip.file(fileName, arrayBuffer);
         })
     );
 
+    // Generiert die ZIP-Datei als Blob und startet den Download
     const content = await zip.generateAsync({ type: "blob" });
     saveAs(content, "download.zip");
   } catch (error) {
@@ -94,5 +104,6 @@ const downloadSelectedFilesAsZip = async () => {
   }
 };
 
+// Exponiert keine Funktionen nach außen
 defineExpose({});
 </script>
